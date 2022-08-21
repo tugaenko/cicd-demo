@@ -32,7 +32,7 @@ jobs:
       run: |
         python manage.py test
 
-  deploy:
+  build:
     needs: tests
     runs-on: ubuntu-latest
 
@@ -52,3 +52,38 @@ jobs:
       with:
         push: true
         tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+     - name: executing remote ssh commands using password
+       uses: appleboy/ssh-action@master
+       with:
+         host: ${{ secrets.HOST }}
+         username: ${{ secrets.USERNAME }}
+         key: ${{ secrets.SSH_KEY }}
+         script:
+           cd demo/cicd
+           export REGISTRY=${{ env.REGISTRY }}
+           export IMAGE_NAME=${{ env.IMAGE_NAME}}
+
+           echo "${{ github.token }}" | docker login --username ${{ github.actor }} --password-stdin
+
+           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+           sudo docker stop $(sudo docker ps -a -q)
+           sudo docker run  -d -p 5000:5000 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+    #       docker-compose stop web
+    #       docker-compose rm -f backend
+    #       docker compose up -d
+    
+    #  - name: ls -a via ssh
+    #    uses: fifsky/ssh-action@master
+    #    with:
+    #      command: |
+    #        cd /tmp
+    #        ls -a
+    #      host: ${{ secrets.HOST }}
+    #      user: ${{ secrets.USERNAME }}
+    #      key: ${{ secrets.SSH_KEY}}
